@@ -354,7 +354,9 @@ class ClimateEntity(Entity, cached_properties=CACHED_PROPERTIES_WITH_ATTR_):
             return None
         # Support hvac_mode as string for custom integration backwards compatibility
         if not isinstance(hvac_mode, HVACMode):
-            return HVACMode(hvac_mode).value  # type: ignore[unreachable]
+            if hvac_mode == "unknown":  # type: ignore[unreachable]
+                return HVACMode.OFF
+            return HVACMode(hvac_mode).value
         return hvac_mode.value
 
     @property
