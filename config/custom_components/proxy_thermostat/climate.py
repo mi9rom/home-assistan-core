@@ -171,7 +171,9 @@ async def async_setup_platform(
 
 class _TempResolver:
     _max_len = 3
-    _temps = []
+
+    def __init__(self):
+        self._temps = []
 
     def add_temp(self, temp):
         if temp is None:
@@ -503,6 +505,12 @@ class ProxyThermostat(ClimateEntity, RestoreEntity):
     def _async_update_temp(self, state: State) -> None:
         """Update thermostat with latest state from sensor."""
         try:
+            _LOGGER.debug(
+                "COM-17 [%s]: sensor temp: %s , %s",
+                self._attr_name,
+                state.state,
+                self._debug_info(),
+            )
             cur_temp = float(state.state)
             if not math.isfinite(cur_temp):
                 raise ValueError(f"Sensor has illegal state {state.state}")
@@ -648,9 +656,25 @@ class ProxyThermostat(ClimateEntity, RestoreEntity):
         _LOGGER.debug("COM-99 [%s]: %s", self._attr_name, self._debug_info())
 
     def _debug_info(self):
+        # Handle the possibility that _cur_temp is None
+        cur_temp_display = (
+            "None" if self._cur_temp is None else round(self._cur_temp, 1)
+        )
+
+        try:
+            target_temp = self._target_target_temp()
+        except Exception as e:  # noqa: BLE001
+            target_temp = f"Error: {e}"
+        try:
+            temp_resolver_info = self._temp_resolver.debug_inf()
+        except Exception as e:  # noqa: BLE001
+            temp_resolver_info = f"Error: {e}"
+
         return (
-            f"(temp:{round(self._cur_temp,1)}, target temp:{round(self._target_temp, 1)}, target therm set to:{self._target_target_temp()}"
-            f", temp resolver:{self._temp_resolver.debug_inf()})"
+            f"(temp: {cur_temp_display}, "
+            f"target temp: {round(self._target_temp, 1)}, "
+            f"target therm set to: {target_temp}, "
+            f"temp resolver: {temp_resolver_info})"
         )
 
     def _temp_is_rising(self):
