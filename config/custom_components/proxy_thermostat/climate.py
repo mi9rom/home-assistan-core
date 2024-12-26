@@ -661,7 +661,7 @@ class ProxyThermostat(ClimateEntity, RestoreEntity):
 
     def _check_only_changed(self, off: bool) -> bool:
         return self._only_changed is False or (
-            not self._temp_resolver.in_tunel(self._cur_temp)
+            not self._temp_resolver.in_tunel(self._target_temp)
             and self._target_temp_not_set(off)
         )
 
