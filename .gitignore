@@ -1,6 +1,6 @@
 config/.storage
 config/*.db*
-config/*.yaml
+#config/*.yaml
 config/*.log*
 config/.HA_VER*
 config/blueprints

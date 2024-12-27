@@ -1,0 +1,92 @@
+# Loads default set of integrations. Do not remove.
+default_config:
+
+# Load frontend themes from the themes folder
+frontend:
+  themes: !include_dir_merge_named themes
+
+automation: !include automations.yaml
+script: !include scripts.yaml
+scene: !include scenes.yaml
+
+logger:
+  default: info
+  logs:
+    homeassistant.components.cloud: debug
+    custom_components.proxy_thermostat.climate: debug
+
+input_number:
+  room_temp_in:
+    name: Room Temp
+    initial: 22.0 # Initial value
+    min: 21.5 # Minimum value
+    max: 22.5 # Maximum value
+    step: 0.1 # Step size for decimals
+    mode: box # Slider for user input
+  target_cli_temp_in:
+    name: Target cli temp
+    initial: 22.0 # Initial value
+    min: 20 # Minimum value
+    max: 25 # Maximum value
+    step: 0.5 # Step size for decimals
+    mode: box # Slider for user input
+
+input_boolean:
+  heater_ib:
+    name: Heater Switch
+    initial: false
+
+switch:
+  - platform: template
+    switches:
+      heater_sw:
+        friendly_name: "Heater Switch"
+        value_template: "{{ is_state('input_boolean.heater_ib', 'on') }}"
+        turn_on:
+          service: input_boolean.turn_on
+          target:
+            entity_id: input_boolean.heater_ib
+        turn_off:
+          service: input_boolean.turn_off
+          target:
+            entity_id: input_boolean.heater_ib
+
+sensor:
+  - platform: template
+    sensors:
+      room_temp_sens:
+        friendly_name: "Room Temperature"
+        value_template: "{{ states('input_number.room_temp_in') | float }}"
+        unit_of_measurement: "°C"
+      target_cli_temp_sens:
+        friendly_name: "Target cli temp sensor"
+        value_template: "{{ states('input_number.target_cli_temp_in') | float }}"
+        unit_of_measurement: "°C"
+
+climate:
+  - platform: generic_thermostat
+    unique_id: "my_generic_uid"
+    name: my_generic
+    heater: switch.heater_sw
+    target_sensor: sensor.target_cli_temp_sens
+    min_temp: 5
+    max_temp: 30
+    target_temp: 22.0
+    ac_mode: false
+    cold_tolerance: 0.1
+    hot_tolerance: 0.1
+    initial_hvac_mode: "heat"
+
+  - platform: proxy_thermostat
+    unique_id: thermostat.my_test_uid
+    name: my test
+    heater: climate.my_generic
+    target_sensor: sensor.room_temp_sens
+    min_temp: 10
+    max_temp: 25
+    ac_mode: false
+    cold_tolerance: 0.1
+    hot_tolerance: 0.1
+    keep_alive:
+      minutes: 1
+    only_changed: true
