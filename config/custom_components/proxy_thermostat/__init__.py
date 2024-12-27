@@ -1,13 +1,6 @@
-# The proxy_thermostat component.  # noqa: D104
-
-from __future__ import annotations
+"""The proxy_thermostat component."""
 
 import logging
 
-from homeassistant.const import Platform
-
-DOMAIN = "proxy_thermostat"
-PLATFORMS = [Platform.CLIMATE]
-
 _LOGGER = logging.getLogger(__name__)
-_LOGGER.info("COM-16: Starting")
+_LOGGER.info("COM-01: Starting proxy_thermosta")
