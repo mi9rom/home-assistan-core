@@ -221,8 +221,9 @@ async def _async_setup_config(
 class _TempResolver:
     _max_len = 3
 
-    def __init__(self) -> None:
+    def __init__(self, name: str) -> None:
         self._temps = []
+        self._attr_name = name
 
     def add_temp(self, temp):
         if temp is None:
@@ -256,11 +257,15 @@ class _TempResolver:
         if len(self._temps) < self._max_len or temp is None:
             return False
 
+        if self._temps[2] != self._temps[0]:
+            return False
+
         mini = min(self._temps)
         maxi = max(self._temps)
-        if (maxi - mini) > 0.11:
-            return False
-        if temp in (mini, maxi):
+        ave = (maxi + mini) / 2
+
+        if abs(temp - ave) <= 0.4:
+            _LOGGER.debug("COM-19 [%s]: In tunnel", self._attr_name)
             return True
 
         return False
@@ -342,7 +347,7 @@ class ProxyThermostat(ClimateEntity, RestoreEntity):
         self.new_state = None
         self.old_state = None
         self.target_changed_time = None
-        self._temp_resolver = _TempResolver()
+        self._temp_resolver = _TempResolver(self._attr_name)
 
     async def async_added_to_hass(self) -> None:
         """Run when entity about to be added."""
