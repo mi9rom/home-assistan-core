@@ -420,8 +420,16 @@ class ProxyThermostat(ClimateEntity, RestoreEntity):
             ):
                 self._attr_preset_mode = old_state.attributes.get(ATTR_PRESET_MODE)
             if not self._hvac_mode and old_state.state:
-                self._hvac_mode = HVACMode(old_state.state)
-
+                # MR
+                if old_state.state in [member.value for member in HVACMode]:
+                    self._hvac_mode = HVACMode(old_state.state)
+                else:
+                    _LOGGER.warning(
+                        "COM-22 [%s]: Unknown hwac mode: %s. Settint to HVACMode.HEAT",
+                        self._attr_name,
+                        old_state.state,
+                    )
+                    self._hvac_mode = HVACMode.HEAT
         else:
             # No previous state, try and restore defaults
             if self._target_temp is None:
@@ -595,6 +603,7 @@ class ProxyThermostat(ClimateEntity, RestoreEntity):
         self, time: datetime | None = None, force: bool = False
     ) -> None:
         """Check if we need to turn heating on or off."""
+        self._print_debug_states("COM-24", "_async_control_heating")
         async with self._temp_lock:
             if not self._active and None not in (
                 self._cur_temp,
@@ -603,15 +612,10 @@ class ProxyThermostat(ClimateEntity, RestoreEntity):
                 self._active = True
                 # MR
                 _LOGGER.debug(
-                    (
-                        "COM-16 [%s]: Obtained current and target temperature. "
-                        "Proxy thermostat active ",
-                    ),
+                    "COM-16 [%s]: Obtained current and target temperature. "
+                    "Proxy thermostat active",
                     self._attr_name,
-                    self._cur_temp,
-                    self._target_temp,
                 )
-                self._print_debug_states()
 
             if not self._active or self._hvac_mode == HVACMode.OFF:
                 return
@@ -646,15 +650,19 @@ class ProxyThermostat(ClimateEntity, RestoreEntity):
 
             # MR do konca
             if self._is_device_active:
-                if (self.ac_mode and too_cold) or (not self.ac_mode and too_hot):
-                    if self._check_only_changed(off=True):
-                        _LOGGER.info(
-                            "COM-18 [%s]: Turning off heater",
+                if (
+                    temp_delta == 0
+                    or (self.ac_mode and too_cold)
+                    or (not self.ac_mode and too_hot)
+                ):
+                    # turn off
+                    if self._not_in_tunell() and self._check_only_changed(off=True):
+                        _LOGGER.debug(
+                            "COM-18 [%s]: changing state from active to turn OFF",
                             self._attr_name,
                         )
-                        self._print_debug_states()
                         await self._async_heater_turn_off(time is not None)
-                    elif temp_delta > 0.5 and time is None and self._temp_is_rising():
+                    elif temp_delta > 0.5 and self._temp_is_rising():
                         _LOGGER.warning(
                             "COM-02 [%s]: force turn off due to temp delta and device still active, current=%s - target=%s > 0.5",
                             self._attr_name,
@@ -663,27 +671,16 @@ class ProxyThermostat(ClimateEntity, RestoreEntity):
                         )
                         self._print_debug_states()
                         await self._async_heater_turn_off(time is not None)
-                elif self._keep_alive and self._check_only_changed(off=False):
-                    if self._only_changed:
-                        _LOGGER.info(
-                            "COM-03 [%s]: turn on because target temp to change",
-                            self._attr_name,
-                        )
-                    else:
+                    elif time is not None and self._check_only_changed(
+                        off=True
+                    ):  # keep alive
                         _LOGGER.debug(
-                            "COM-04 [%s]: force turn on due to keep alive",
+                            "COM-20 [%s]: turn off due to keep alive",
                             self._attr_name,
                         )
-                    self._print_debug_states()
-                    await self._async_heater_turn_on(time is not None)
-                elif not self._keep_alive and self._target_temp_not_set(off=False):
-                    _LOGGER.info(
-                        "COM-05 [%s]: turn on because target temp to change",
-                        self._attr_name,
-                    )
-                    self._print_debug_states()
-                    await self._async_heater_turn_on(time is not None)
-                elif temp_delta < -0.5 and time is None and self._temp_is_falling():
+                        await self._async_heater_turn_off(time is not None)
+                # active and not to turn off
+                elif temp_delta < -0.5 and self._temp_is_falling():
                     _LOGGER.warning(
                         "COM-06 [%s]: force turn on due to temp delta,  target=%s - current=%s > 0.5",
                         self._attr_name,
@@ -692,10 +689,33 @@ class ProxyThermostat(ClimateEntity, RestoreEntity):
                     )
                     self._print_debug_states()
                     await self._async_heater_turn_on(time is not None)
+                # keep alive
+                elif time is not None and self._check_only_changed(off=False):
+                    _LOGGER.debug(
+                        "COM-04 [%s]: turn on due to keep alive",
+                        self._attr_name,
+                    )
+                    await self._async_heater_turn_on(time is not None)
+                # if target thermostat temp need to change
+                elif self._not_in_tunell() and self._target_temp_not_set(off=False):
+                    _LOGGER.info(
+                        "COM-26 [%s]: turn ON due to target_temp_not_set",
+                        self._attr_name,
+                    )
+                    await self._async_heater_turn_on(time is not None)
+
             # device not active
-            elif (self.ac_mode and too_hot) or (not self.ac_mode and too_cold):
-                if self._check_only_changed(off=False):
-                    _LOGGER.info("COM-15 [%s]: Turning on heater", self._attr_name)
+            elif (
+                temp_delta == 0
+                or (self.ac_mode and too_hot)
+                or (not self.ac_mode and too_cold)
+            ):
+                # turn on
+                if self._not_in_tunell() and self._check_only_changed(off=False):
+                    _LOGGER.debug(
+                        "COM-15 [%s]: changing state from no active to turn ON",
+                        self._attr_name,
+                    )
                     await self._async_heater_turn_on(time is not None)
                 elif temp_delta < -0.5 and time is None and self._temp_is_falling():
                     _LOGGER.warning(
@@ -704,47 +724,48 @@ class ProxyThermostat(ClimateEntity, RestoreEntity):
                         round(self._target_temp, 1),
                         round(self._cur_temp, 1),
                     )
-                    self._print_debug_states()
                     await self._async_heater_turn_on(time is not None)
-            elif self._keep_alive and self._check_only_changed(off=True):
-                if self._only_changed:
-                    _LOGGER.info(
-                        "COM-08 [%s]: turn off due to  target temp to change",
-                        self._attr_name,
-                    )
-                else:
+                # keep alive
+                elif time is not None and self._check_only_changed(off=False):
                     _LOGGER.debug(
-                        "COM-09 [%s]: force turn off due to keep alive",
+                        "COM-21 [%s]: turn on due to keep alive",
                         self._attr_name,
                     )
-                self._print_debug_states()
-                await self._async_heater_turn_off(time is not None)
-            elif not self._keep_alive and self._target_temp_not_set(off=True):
-                _LOGGER.info(
-                    "COM-10 [%s]: turn off because target temp to change",
-                    self._attr_name,
-                )
-                self._print_debug_states()
-                await self._async_heater_turn_off(time is not None)
-            elif temp_delta > 0.5 and time is None and self._temp_is_rising():
+                    await self._async_heater_turn_on(time is not None)
+            # not active and not to turn on
+            elif temp_delta > 0.5 and self._temp_is_rising():
                 _LOGGER.warning(
                     "COM-11 [%s]: force turn off due to temp delta, current=%s - target=%s > 0.5",
                     self._attr_name,
                     round(self._cur_temp, 1),
                     round(self._target_temp, 1),
                 )
-                self._print_debug_states()
+                await self._async_heater_turn_off(time is not None)
+            # keep alive
+            elif time is not None and self._check_only_changed(off=True):
+                _LOGGER.debug(
+                    "COM-09 [%s]: turn off due to keep alive", self._attr_name
+                )
+                await self._async_heater_turn_off(time is not None)
+            # if target thermostat temp needs to change
+            elif self._not_in_tunell() and self._target_temp_not_set(off=True):
+                _LOGGER.debug(
+                    "COM-25 [%s]: turn OFF due to target_temp_not_set", self._attr_name
+                )
                 await self._async_heater_turn_off(time is not None)
 
-    def _print_debug_states(self):
-        _LOGGER.debug("COM-99 [%s]: %s", self._attr_name, self._debug_info())
-
-    def _debug_info(self):
-        # Handle the possibility that _cur_temp is None
-        cur_temp_display = (
-            "None" if self._cur_temp is None else round(self._cur_temp, 1)
+    # MR
+    def _print_debug_states(self, code: str | None = None, msg: str | None = None):
+        _LOGGER.debug(
+            "%s [%s]: %s %s",
+            "COM-99" if code is None else code,
+            self._attr_name,
+            "" if msg is None else msg,
+            self._debug_info(),
         )
 
+    # MR
+    def _debug_info(self):
         try:
             target_temp = self._target_target_temp()
         except Exception as e:  # noqa: BLE001
@@ -754,45 +775,63 @@ class ProxyThermostat(ClimateEntity, RestoreEntity):
         except Exception as e:  # noqa: BLE001
             temp_resolver_info = f"Error: {e}"
 
-        return (
-            f"(temp: {cur_temp_display}, "
-            f"target temp: {round(self._target_temp, 1)}, "
-            f"target therm set to: {target_temp}, "
-            f"temp resolver: {temp_resolver_info})"
-        )
+        try:
+            res = (
+                "("
+                f"temp: {None if self._cur_temp is None else round(self._cur_temp, 1)}, "
+                f"target temp: {None if self._target_temp is None else round(self._target_temp, 1)}, "
+                f"target therm set to: {None if target_temp is None else round(target_temp, 1)}, "
+                f"temp resolver: {temp_resolver_info} "
+                f"mode = {self._hvac_mode}"
+                ")"
+            )
+        except Exception as e:  # noqa: BLE001
+            _LOGGER.error("COM-19 [%s]: %s", self._attr_name, e)
+            res = "ERROR"
 
+        return res
+
+    # MR
     def _temp_is_rising(self):
         return self._temp_resolver.is_riging()
 
+    # MR
     def _temp_is_falling(self):
         return self._temp_resolver.is_descending()
 
+    # MR
     def _check_only_changed(self, off: bool) -> bool:
-        return self._only_changed is False or (
-            not self._temp_resolver.in_tunel(self._target_temp)
-            and self._target_temp_not_set(off)
-        )
+        return self._only_changed is False or self._target_temp_not_set(off)
 
+    # MR
     def _target_temp_not_set(self, off: bool):
         return (off and self._target_target_temp() != self._heater_turn_off_temp()) or (
             off is False and self._target_target_temp() != self._heater_turn_on_temp()
         )
 
+    # MR
     def _target_current_temp(self):
         return (
             self.new_state.attributes["current_temperature"] if self.new_state else None
         )
 
+    # MR
     def _target_target_temp(self):
         return self.new_state.attributes["temperature"] if self.new_state else None
 
     @property
-    def _is_device_active(self) -> bool | None:
+    def _is_device_active(self):
         """If the toggleable device is currently active."""
-        if not self.hass.states.get(self.heater_entity_id):
+
+        state = self.hass.states.get(self.heater_entity_id)
+        if not state:
             return None
 
-        return self.hass.states.is_state(self.heater_entity_id, STATE_ON)
+        key = "hvac_action"
+        if state.attributes and key in state.attributes:
+            attr = state.attributes[key]
+            return attr != HVACAction.IDLE
+        return None
 
     # MR
     async def _async_heater_turn_on(self, k_alive=False):
@@ -845,7 +884,7 @@ class ProxyThermostat(ClimateEntity, RestoreEntity):
         return temp
 
     # MR
-    def _heater_turn_off_temp(self):
+    def _heater_turn_off_temp(self) -> float:
         delta_temp = round(self.current_temperature - self.target_temperature, 1)
 
         if self._target_current_temp() is None or self._hvac_mode == HVACMode.OFF:
@@ -871,3 +910,7 @@ class ProxyThermostat(ClimateEntity, RestoreEntity):
         await self.hass.services.async_call(
             "climate", "set_temperature", data, context=self._context
         )
+
+    # MR
+    def _not_in_tunell(self) -> bool:
+        return not self._temp_resolver.in_tunel(self._target_temp)
