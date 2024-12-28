@@ -186,7 +186,7 @@ async def _async_setup_config(
     target_temperature_step: float | None = config.get(CONF_TEMP_STEP)
     unit = hass.config.units.temperature_unit
 
-    # MY
+    # MR
     only_changed = config.get(CONF_ONLY_CHANGED)
 
     async_add_entities(
@@ -217,7 +217,7 @@ async def _async_setup_config(
     )
 
 
-# MY
+# MR
 class _TempResolver:
     _max_len = 3
 
@@ -341,7 +341,7 @@ class ProxyThermostat(ClimateEntity, RestoreEntity):
             self._attr_preset_modes = [PRESET_NONE]
         self._presets = presets
 
-        # MY
+        # MR
         self._only_changed = only_changed
         self._last_target_temp_set = None
         self.new_state = None
@@ -360,7 +360,7 @@ class ProxyThermostat(ClimateEntity, RestoreEntity):
             )
         )
 
-        # MY
+        # MR
         self.async_on_remove(
             async_track_state_change_event(
                 self.hass, [self.heater_entity_id], self._async_target_climate_changed
@@ -755,72 +755,8 @@ class ProxyThermostat(ClimateEntity, RestoreEntity):
                 await self._async_heater_turn_off(time is not None)
 
     # MR
-    def _print_debug_states(self, code: str | None = None, msg: str | None = None):
-        _LOGGER.debug(
-            "%s [%s]: %s %s",
-            "COM-99" if code is None else code,
-            self._attr_name,
-            "" if msg is None else msg,
-            self._debug_info(),
-        )
-
-    # MR
-    def _debug_info(self):
-        try:
-            target_temp = self._target_target_temp()
-        except Exception as e:  # noqa: BLE001
-            target_temp = f"Error: {e}"
-        try:
-            temp_resolver_info = self._temp_resolver.debug_inf()
-        except Exception as e:  # noqa: BLE001
-            temp_resolver_info = f"Error: {e}"
-
-        try:
-            res = (
-                "("
-                f"temp: {None if self._cur_temp is None else round(self._cur_temp, 1)}, "
-                f"target temp: {None if self._target_temp is None else round(self._target_temp, 1)}, "
-                f"target therm set to: {None if target_temp is None else round(target_temp, 1)}, "
-                f"temp resolver: {temp_resolver_info} "
-                f"mode = {self._hvac_mode}"
-                ")"
-            )
-        except Exception as e:  # noqa: BLE001
-            _LOGGER.error("COM-19 [%s]: %s", self._attr_name, e)
-            res = "ERROR"
-
-        return res
-
-    # MR
-    def _temp_is_rising(self):
-        return self._temp_resolver.is_rising()
-
-    # MR
-    def _temp_is_falling(self):
-        return self._temp_resolver.is_descending()
-
-    # MR
-    def _check_only_changed(self, off: bool) -> bool:
-        return self._only_changed is False or self._target_temp_not_set(off)
-
-    # MR
-    def _target_temp_not_set(self, off: bool):
-        return (off and self._target_target_temp() != self._heater_turn_off_temp()) or (
-            off is False and self._target_target_temp() != self._heater_turn_on_temp()
-        )
-
-    # MR
-    def _target_current_temp(self):
-        return (
-            self.new_state.attributes["current_temperature"] if self.new_state else None
-        )
-
-    # MR
-    def _target_target_temp(self):
-        return self.new_state.attributes["temperature"] if self.new_state else None
-
     @property
-    def _is_device_active(self):
+    def _is_device_active(self) -> bool | None:
         """If the toggleable device is currently active."""
 
         state = self.hass.states.get(self.heater_entity_id)
@@ -834,13 +770,13 @@ class ProxyThermostat(ClimateEntity, RestoreEntity):
         return None
 
     # MR
-    async def _async_heater_turn_on(self, k_alive=False):
+    async def _async_heater_turn_on(self, k_alive=False) -> None:
         """Turn heater  device on."""
         temp = self._heater_turn_on_temp()
         await self._async_set_target_temp(temp=temp, k_alive=k_alive)
 
     # MR
-    async def _async_heater_turn_off(self, k_alive=False):
+    async def _async_heater_turn_off(self, k_alive=False) -> None:
         """Turn heater  device off."""
         temp = self._heater_turn_off_temp()
         await self._async_set_target_temp(temp=temp, k_alive=k_alive)
@@ -868,8 +804,76 @@ class ProxyThermostat(ClimateEntity, RestoreEntity):
 
         self.async_write_ha_state()
 
+    # ----------------------------------------------------------------------------------
     # MR
-    def _heater_turn_on_temp(self):
+    def _print_debug_states(
+        self, code: str | None = None, msg: str | None = None
+    ) -> None:
+        _LOGGER.debug(
+            "%s [%s]: %s %s",
+            "COM-99" if code is None else code,
+            self._attr_name,
+            "" if msg is None else msg,
+            self._debug_info(),
+        )
+
+    # MR
+    def _debug_info(self) -> str:
+        try:
+            target_temp = self._target_target_temp()
+        except Exception as e:  # noqa: BLE001
+            target_temp = f"Error: {e}"
+        try:
+            temp_resolver_info = self._temp_resolver.debug_inf()
+        except Exception as e:  # noqa: BLE001
+            temp_resolver_info = f"Error: {e}"
+
+        try:
+            res = (
+                "("
+                f"temp: {None if self._cur_temp is None else round(self._cur_temp, 1)}, "
+                f"target temp: {None if self._target_temp is None else round(self._target_temp, 1)}, "
+                f"target therm set to: {None if target_temp is None else round(target_temp, 1)}, "
+                f"temp resolver: {temp_resolver_info} "
+                f"mode = {self._hvac_mode}"
+                ")"
+            )
+        except Exception as e:  # noqa: BLE001
+            _LOGGER.error("COM-19 [%s]: %s", self._attr_name, e)
+            res = "ERROR"
+
+        return res
+
+    # MR
+    def _temp_is_rising(self) -> bool:
+        return self._temp_resolver.is_rising()
+
+    # MR
+    def _temp_is_falling(self) -> bool:
+        return self._temp_resolver.is_descending()
+
+    # MR
+    def _check_only_changed(self, off: bool) -> bool:
+        return self._only_changed is False or self._target_temp_not_set(off)
+
+    # MR
+    def _target_temp_not_set(self, off: bool) -> bool:
+        return (off and self._target_target_temp() != self._heater_turn_off_temp()) or (
+            off is False and self._target_target_temp() != self._heater_turn_on_temp()
+        )
+
+    # MR
+    def _target_current_temp(self) -> Any | None:
+        return (
+            self.new_state.attributes["current_temperature"] if self.new_state else None
+        )
+
+    # MR
+    def _target_target_temp(self) -> float | None:
+        return self.new_state.attributes["temperature"] if self.new_state else None
+
+    # MR
+    def _heater_turn_on_temp(self) -> float:
         delta_temp = round(self.target_temperature - self.current_temperature, 1)
         if self._target_current_temp() is None:
             temp = 30
