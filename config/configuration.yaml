@@ -87,6 +87,6 @@ climate:
     ac_mode: false
     cold_tolerance: 0.1
     hot_tolerance: 0.1
-    keep_alive:
-      minutes: 1
+    # keep_alive:
+    #  minutes: 1
     only_changed: true
