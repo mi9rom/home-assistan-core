@@ -236,7 +236,7 @@ class _TempResolver:
             self._temps = self._temps[1:]
         self._temps.append(temp)
 
-    def is_riging(self) -> bool:
+    def is_rising(self) -> bool:
         if len(self._temps) < self._max_len:
             return False
         if self._temps[2] > self._temps[0]:
@@ -253,7 +253,7 @@ class _TempResolver:
     def debug_inf(self) -> str:
         return f"temps:{self._temps}"
 
-    def in_tunel(self, temp: float) -> bool:
+    def in_tunnel(self, temp: float) -> bool:
         if len(self._temps) < self._max_len or temp is None:
             return False
 
@@ -262,9 +262,9 @@ class _TempResolver:
 
         mini = min(self._temps)
         maxi = max(self._temps)
-        ave = (maxi + mini) / 2
+        ave = (maxi + mini) / 2.0
 
-        if abs(temp - ave) <= 0.4:
+        if abs(temp - ave) < 0.3:
             _LOGGER.debug("COM-19 [%s]: In tunnel", self._attr_name)
             return True
 
@@ -656,9 +656,9 @@ class ProxyThermostat(ClimateEntity, RestoreEntity):
                     or (not self.ac_mode and too_hot)
                 ):
                     # turn off
-                    if self._not_in_tunell() and self._check_only_changed(off=True):
+                    if self._not_in_tunnel() and self._check_only_changed(off=True):
                         _LOGGER.debug(
-                            "COM-18 [%s]: changing state from active to turn OFF",
+                            "COM-18 [%s]: turn OFF, changing state from active",
                             self._attr_name,
                         )
                         await self._async_heater_turn_off(time is not None)
@@ -697,7 +697,7 @@ class ProxyThermostat(ClimateEntity, RestoreEntity):
                     )
                     await self._async_heater_turn_on(time is not None)
                 # if target thermostat temp need to change
-                elif self._not_in_tunell() and self._target_temp_not_set(off=False):
+                elif self._not_in_tunnel() and self._target_temp_not_set(off=False):
                     _LOGGER.info(
                         "COM-26 [%s]: turn ON due to target_temp_not_set",
                         self._attr_name,
@@ -711,9 +711,9 @@ class ProxyThermostat(ClimateEntity, RestoreEntity):
                 or (not self.ac_mode and too_cold)
             ):
                 # turn on
-                if self._not_in_tunell() and self._check_only_changed(off=False):
+                if self._not_in_tunnel() and self._check_only_changed(off=False):
                     _LOGGER.debug(
-                        "COM-15 [%s]: changing state from no active to turn ON",
+                        "COM-15 [%s]: turn ON, changing state from not active",
                         self._attr_name,
                     )
                     await self._async_heater_turn_on(time is not None)
@@ -748,7 +748,7 @@ class ProxyThermostat(ClimateEntity, RestoreEntity):
                 )
                 await self._async_heater_turn_off(time is not None)
             # if target thermostat temp needs to change
-            elif self._not_in_tunell() and self._target_temp_not_set(off=True):
+            elif self._not_in_tunnel() and self._target_temp_not_set(off=True):
                 _LOGGER.debug(
                     "COM-25 [%s]: turn OFF due to target_temp_not_set", self._attr_name
                 )
@@ -793,7 +793,7 @@ class ProxyThermostat(ClimateEntity, RestoreEntity):
 
     # MR
     def _temp_is_rising(self):
-        return self._temp_resolver.is_riging()
+        return self._temp_resolver.is_rising()
 
     # MR
     def _temp_is_falling(self):
@@ -912,5 +912,9 @@ class ProxyThermostat(ClimateEntity, RestoreEntity):
         )
 
     # MR
-    def _not_in_tunell(self) -> bool:
-        return not self._temp_resolver.in_tunel(self._target_temp)
+    def _not_in_tunnel(self) -> bool:
+        return not self._temp_resolver.in_tunnel(self._target_temp)
+
+    # MR
+    def _in_tunnel(self) -> bool:
+        return self._temp_resolver.in_tunnel(self._target_temp)
