@@ -503,7 +503,8 @@ class ProxyThermostat(ClimateEntity, RestoreEntity):
         elif hvac_mode == HVACMode.OFF:
             self._hvac_mode = HVACMode.OFF
             if self._is_device_active:
-                await self._async_heater_turn_off()
+                # MR
+                await self._async_set_target_temp(5)
         else:
             _LOGGER.error("Unrecognized hvac mode: %s", hvac_mode)
             return
@@ -628,6 +629,9 @@ class ProxyThermostat(ClimateEntity, RestoreEntity):
             # MR
             if self._hvac_mode == HVACMode.OFF:
                 if force_resend or self._target_target_temp() > 5:
+                    self._print_debug_states(
+                        "COM-34", "Turn off because of HVACMode.OFF"
+                    )
                     await self._async_set_target_temp(5)
 
             if not self._active or self._hvac_mode == HVACMode.OFF:
