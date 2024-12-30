@@ -626,8 +626,9 @@ class ProxyThermostat(ClimateEntity, RestoreEntity):
             force_resend = self._is_timeout_counter()
 
             # MR
-            if force_resend and self._hvac_mode == HVACMode.OFF:
-                self._async_set_target_temp(5)
+            if self._hvac_mode == HVACMode.OFF:
+                if force_resend or self._target_target_temp() > 5:
+                    await self._async_set_target_temp(5)
 
             if not self._active or self._hvac_mode == HVACMode.OFF:
                 return
