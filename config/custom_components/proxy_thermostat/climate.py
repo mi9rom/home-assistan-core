@@ -81,6 +81,8 @@ from .const import (
     PLATFORMS,
 )
 
+from .utils import get_differences
+
 _LOGGER = logging.getLogger(__name__)
 
 DEFAULT_NAME = "Proxy Thermostat"
@@ -567,11 +569,12 @@ class ProxyThermostat(ClimateEntity, RestoreEntity):
         self.target_changed_time = datetime.now()
         self._reset_timeout_counter()
         _LOGGER.debug(
-            "COM-14 [%s]: Target therm state change: %s  NEW: %s OLD: %s",
+            "COM-14 [%s]: Target therm state change:\n    %s",
             self._attr_name,
-            self.target_changed_time,
-            self.new_state,
-            self.old_state,
+            get_differences(
+                self.old_state._as_dict if self.old_state else {},  # noqa: SLF001
+                self.new_state._as_dict if self.new_state else {},  # noqa: SLF001
+            ),
         )
         if self.new_state is None:
             return
