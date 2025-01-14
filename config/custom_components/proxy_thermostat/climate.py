@@ -942,7 +942,8 @@ class ProxyThermostat(ClimateEntity, RestoreEntity):
 
     # MR
     async def _async_set_target_temp(self, temp: float) -> None:
-        self._start_timeout_counter()
+        if self._target_target_temp() is not None:
+            self._start_timeout_counter()
         data = {ATTR_ENTITY_ID: self.heater_entity_id, ATTR_TEMPERATURE: temp}
         _LOGGER.debug(
             "COM-12 [%s]: Setting target thermostat tmperature: %s",
