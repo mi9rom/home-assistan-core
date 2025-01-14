@@ -570,7 +570,7 @@ class ProxyThermostat(ClimateEntity, RestoreEntity):
         self.target_changed_time = datetime.now()
         self._reset_timeout_counter()
         _LOGGER.debug(
-            "COM-14 [%s]: Target therm state change:\n    %s",
+            "COM-14 [%s]: Received target therm state:\n    %s",
             self._attr_name,
             get_differences(
                 self.old_state._as_dict if self.old_state else {},  # noqa: SLF001
